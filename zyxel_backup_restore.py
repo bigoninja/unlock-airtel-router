@@ -196,7 +196,10 @@ import os
 import hashlib
 import subprocess
 import argparse
+import getpass
+import json
 import re
+from pathlib import Path
 from typing import Optional
 import urllib.request
 import urllib.parse
@@ -212,6 +215,45 @@ ENCRYPTION_PASSWORD = "EwhJaD44DfprDOs7OXx9jzAtLg5PKtD8"
 # Default router configuration
 DEFAULT_ROUTER_IP = "192.168.1.1"
 DEFAULT_USERNAME = "admin"
+
+def get_router_credentials():
+    """Read .env and prompt for any missing router details"""
+    env_file = Path(__file__).resolve().with_name(".env")
+    values = {}
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            key, value = line.split("=", 1)
+            value = value.strip()
+            if value.startswith('"'):
+                value = json.loads(value)
+            elif value.startswith("'") and value.endswith("'"):
+                value = value[1:-1]
+            values[key.strip()] = value
+
+    changed = False
+    for key, label, default in [
+        ("ROUTER_IP", "Router IP", DEFAULT_ROUTER_IP),
+        ("USERNAME", "Username", DEFAULT_USERNAME),
+    ]:
+        if not values.get(key):
+            values[key] = input(f"{label} [{default}]: ").strip() or default
+            changed = True
+    if not values.get("PASSWORD"):
+        values["PASSWORD"] = getpass.getpass("Router password: ")
+        if not values["PASSWORD"]:
+            raise SystemExit("Password is required")
+        changed = True
+
+    if changed:
+        with env_file.open("w", encoding="utf-8") as output:
+            env_file.chmod(0o600)
+            for key, value in values.items():
+                output.write(f"{key}={json.dumps(value, ensure_ascii=False)}\n")
+        print(f"Router details saved in {env_file}")
+    return values["ROUTER_IP"], values["USERNAME"], values["PASSWORD"]
+
 
 # ANSI color codes for terminal output
 class Colors:

@@ -1,18 +1,28 @@
-from zyxel_backup_restore import ZyxelBackupTool
+"""
+============================================
+Download and decrypt the router config
+============================================
+"""
 
-ROUTER_IP = "192.168.1.1"
-USERNAME = "admin"
-PASSWORD = "<your-router-password>"
+from zyxel_backup_restore import ZyxelBackupTool, get_router_credentials
 
-tool = ZyxelBackupTool(ROUTER_IP)
 
-if not tool.login(USERNAME, PASSWORD):
-    raise SystemExit("Login failed")
+def main():
+    router_ip, username, password = get_router_credentials()
 
-if not tool.download_backup("config-current.cfg"):
-    raise SystemExit("Backup failed")
+    tool = ZyxelBackupTool(router_ip)
 
-if not tool.decrypt_backup("config-current.cfg", "config-current.xml"):
-    raise SystemExit("Backup downloaded, but decryption failed")
+    if not tool.login(username, password):
+        raise SystemExit("Login failed")
 
-print("Backup downloaded to config-current.cfg and decrypted to config-current.xml.")
+    if not tool.download_backup("config-current.cfg"):
+        raise SystemExit("Backup failed")
+
+    if not tool.decrypt_backup("config-current.cfg", "config-current.xml"):
+        raise SystemExit("Backup downloaded, but decryption failed")
+
+    print("Backup downloaded to config-current.cfg and decrypted to config-current.xml.")
+
+
+if __name__ == "__main__":
+    main()

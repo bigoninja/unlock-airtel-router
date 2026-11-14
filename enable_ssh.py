@@ -1,6 +1,6 @@
 """
 ============================================
-Enable LAN SSH and set user level to 0.
+Enable LAN SSH and set user level to 0
 ============================================
 """
 
@@ -8,11 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from zyxel_backup_restore import ZyxelBackupTool
-
-ROUTER_IP = "192.168.1.1"
-USERNAME = "admin"
-PASSWORD = "<your-router-password>"
+from zyxel_backup_restore import ZyxelBackupTool, get_router_credentials
 
 
 def set_value(parent, name, value, **attributes):
@@ -22,11 +18,11 @@ def set_value(parent, name, value, **attributes):
     node.text = value
 
 
-def add_ssh_config(port):
+def add_ssh_config(router_ip, username, port):
     config = Path.home() / ".ssh" / "config"
     entry = f"""Host airtel
-    HostName {ROUTER_IP}
-    User {USERNAME}
+    HostName {router_ip}
+    User {username}
     Port {port}
     HostKeyAlgorithms +ssh-rsa
     IgnoreUnknown WarnWeakCrypto
@@ -44,7 +40,7 @@ def add_ssh_config(port):
         fields = line.split()
         if fields and fields[0].lower() == "host" and "airtel" in [field.lower() for field in fields[1:]]:
             print(f"Host airtel already exists in {config}; leaving it unchanged.")
-            return False
+            return True
 
     config.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     config.write_text(entry + "\nHost *\n" + existing, encoding="utf-8")
@@ -53,6 +49,7 @@ def add_ssh_config(port):
 
 
 def main():
+    router_ip, username, password = get_router_credentials()
     backup = Path(datetime.now().strftime("backup-%Y%m%d-%H%M%S"))
     backup.mkdir(mode=0o700)
     original_cfg = backup / "config-original.cfg"
@@ -60,8 +57,8 @@ def main():
     edited_xml = backup / "config-ssh.xml"
     edited_cfg = backup / "config-ssh.cfg"
 
-    tool = ZyxelBackupTool(ROUTER_IP)
-    if not tool.login(USERNAME, PASSWORD):
+    tool = ZyxelBackupTool(router_ip)
+    if not tool.login(username, password):
         raise SystemExit("Login failed")
     if not tool.download_backup(str(original_cfg)):
         raise SystemExit("Backup failed")
@@ -71,7 +68,7 @@ def main():
     tree = ET.parse(original_xml)
     root = tree.getroot()
     account = next((entry for entry in root.findall("X_5067F0_Ext/LoginPrivilegeMgmt/*")
-                    if entry.findtext("UserName") == USERNAME), None)
+                    if entry.findtext("UserName") == username), None)
     remote = root.find("X_5067F0_RemoteMGMT")
     ssh = root.find("X_5067F0_RemoteMGMT/SSH")
     if account is None or ssh is None:
@@ -91,19 +88,19 @@ def main():
     print(f"Applying new config and rebooting router.")
 
     tool.cookie_jar.clear()
-    if not tool.login(USERNAME, PASSWORD):
+    if not tool.login(username, password):
         raise SystemExit("Login failed")
     if not tool.restore_backup(str(edited_cfg)):
         raise SystemExit("Restore failed")
 
     print("\nRestore request submitted.")
-    config_added = add_ssh_config(port)
+    config_added = add_ssh_config(router_ip, username, port)
     print("\nAfter the router reboots, connect with:")
     if config_added:
         print("ssh airtel")
     else:
         print(f"ssh -p {port} -o HostKeyAlgorithms=+ssh-rsa -o PreferredAuthentications=password "
-              f"-o PasswordAuthentication=yes -o PubkeyAuthentication=no {USERNAME}@{ROUTER_IP}")
+              f"-o PasswordAuthentication=yes -o PubkeyAuthentication=no {username}@{router_ip}")
     print("Use the router account password.")
 
 
