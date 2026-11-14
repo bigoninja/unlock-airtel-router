@@ -2,10 +2,6 @@
 ============================================
 Unlock the web UI now and after reboot.
 ============================================
-
-PREREQUISITES:
-    - Requires a working router SSH connection.
-    - Run `python enable_ssh.py` to enable SSH on the router.
 """
 
 import subprocess
@@ -74,7 +70,6 @@ mv -f "$candidate" "$startup"
 echo 'UI startup script installed.'
 """
 
-
 def main():
     router_ip, username, _ = get_router_credentials(require_password=False)
     subprocess.run([
@@ -86,8 +81,7 @@ def main():
         f"{username}@{router_ip}", SCRIPT,
     ], check=True)
     print("Refresh the router page to see the unlocked controls.")
-    print("Wait ~2-3 minutes after rebooting router to make sure script is correctly executed.")
-
+    print("After future reboots, give the router ~2-3 minutes for the UI unlock script to run.")
 
 if __name__ == "__main__":
     main()

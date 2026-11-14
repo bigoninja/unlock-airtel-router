@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 r"""
 ================================================================================
@@ -40,19 +40,19 @@ ROUTER WEB INTERFACE:
 
 USAGE EXAMPLES:
     # Download encrypted backup
-    python3 zyxel_backup_restore.py download -u admin -p password -o config-current.cfg
+    python zyxel_backup_restore.py download -u admin -p password -o config-current.cfg
 
     # Decrypt existing backup
-    python3 zyxel_backup_restore.py decrypt -i config-current.cfg -o config-current.xml
+    python zyxel_backup_restore.py decrypt -i config-current.cfg -o config-current.xml
 
     # Encrypt configuration
-    python3 zyxel_backup_restore.py encrypt -i config-edited.xml -o config-edited.cfg
+    python zyxel_backup_restore.py encrypt -i config-edited.xml -o config-edited.cfg
 
     # Restore configuration (WARNING: reboots router)
-    python3 zyxel_backup_restore.py restore -i config-edited.cfg -u admin -p password
+    python zyxel_backup_restore.py restore -i config-edited.cfg -u admin -p password
 
     # Use custom router IP
-    python3 zyxel_backup_restore.py download -u admin -p password -o config-current.cfg -r 10.0.0.1
+    python zyxel_backup_restore.py download -u admin -p password -o config-current.cfg -r 10.0.0.1
 
 REQUIREMENTS:
     Python:
