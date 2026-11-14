@@ -7,7 +7,7 @@
 
 Restore disabled and hidden settings in the Airtel router web UI. The scripts enable SSH on your Airtel router, unlock the UI and keep it unlocked after each reboot.
 
-![Preview of the unlocked Airtel router UI](.github/preview.gif)
+![Preview of the unlocked Airtel router UI](.github/preview.png)
 
 ## :hammer_and_wrench: Install the tools
 
