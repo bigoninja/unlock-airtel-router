@@ -9,10 +9,10 @@ tool = ZyxelBackupTool(ROUTER_IP)
 if not tool.login(USERNAME, PASSWORD):
     raise SystemExit("Login failed")
 
-if not tool.download_backup("backup-current.cfg"):
+if not tool.download_backup("config-current.cfg"):
     raise SystemExit("Backup failed")
 
-if not tool.decrypt_backup("backup-current.cfg", "backup-current.xml"):
+if not tool.decrypt_backup("config-current.cfg", "config-current.xml"):
     raise SystemExit("Backup downloaded, but decryption failed")
 
-print("Backup downloaded to backup-current.cfg and decrypted to backup-current.xml.")
+print("Backup downloaded to config-current.cfg and decrypted to config-current.xml.")

@@ -11,13 +11,13 @@ if confirmation != "RESTORE":
 
 tool = ZyxelBackupTool(ROUTER_IP)
 
-if not tool.encrypt_config("backup-edited.xml", "backup-edited.cfg"):
+if not tool.encrypt_config("config-edited.xml", "config-edited.cfg"):
     raise SystemExit("Encryption failed; restore was not attempted")
 
 if not tool.login(USERNAME, PASSWORD):
     raise SystemExit("Login failed")
 
-if not tool.restore_backup("backup-edited.cfg"):
+if not tool.restore_backup("config-edited.cfg"):
     raise SystemExit("Restore failed")
 
 print("Restore request submitted.")

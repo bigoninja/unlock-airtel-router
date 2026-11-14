@@ -40,19 +40,19 @@ ROUTER WEB INTERFACE:
 
 USAGE EXAMPLES:
     # Download encrypted backup
-    python3 zyxel_backup_restore.py download -u admin -p password -o backup.cfg
+    python3 zyxel_backup_restore.py download -u admin -p password -o config-current.cfg
 
     # Decrypt existing backup
-    python3 zyxel_backup_restore.py decrypt -i backup.cfg -o config.xml
+    python3 zyxel_backup_restore.py decrypt -i config-current.cfg -o config-current.xml
 
     # Encrypt configuration
-    python3 zyxel_backup_restore.py encrypt -i config.xml -o backup.cfg
+    python3 zyxel_backup_restore.py encrypt -i config-edited.xml -o config-edited.cfg
 
     # Restore configuration (WARNING: reboots router)
-    python3 zyxel_backup_restore.py restore -i backup.cfg -u admin -p password
+    python3 zyxel_backup_restore.py restore -i config-edited.cfg -u admin -p password
 
     # Use custom router IP
-    python3 zyxel_backup_restore.py download -u admin -p password -o backup.cfg -r 10.0.0.1
+    python3 zyxel_backup_restore.py download -u admin -p password -o config-current.cfg -r 10.0.0.1
 
 REQUIREMENTS:
     Python:
@@ -289,8 +289,8 @@ class ZyxelBackupTool:
     Example:
         tool = ZyxelBackupTool(router_ip="192.168.1.1")
         if tool.login("admin", "password"):
-            tool.download_backup("backup.cfg")
-            tool.decrypt_backup("backup.cfg", "config.xml")
+            tool.download_backup("config-current.cfg")
+            tool.decrypt_backup("config-current.cfg", "config-current.xml")
     """
 
     def __init__(self, router_ip: str = DEFAULT_ROUTER_IP):
@@ -455,7 +455,7 @@ class ZyxelBackupTool:
 
         Example:
             tool.login("admin", "password")
-            tool.download_backup("backup.cfg")
+            tool.download_backup("config-current.cfg")
         """
         Logger.header("Downloading Backup from Router")
 
@@ -519,7 +519,7 @@ class ZyxelBackupTool:
             True if decryption successful, False otherwise
 
         Example:
-            tool.decrypt_backup("backup.cfg", "config.xml")
+            tool.decrypt_backup("config-current.cfg", "config-current.xml")
         """
         Logger.header("Decrypting Backup File")
         Logger.info(f"Input: {input_file}")
@@ -605,7 +605,7 @@ class ZyxelBackupTool:
             Input file should be valid XML in TR-069 format
 
         Example:
-            tool.encrypt_config("modified.xml", "backup.cfg")
+            tool.encrypt_config("config-edited.xml", "config-edited.cfg")
         """
         Logger.header("Encrypting Configuration File")
         Logger.info(f"Input: {input_file}")
@@ -697,9 +697,9 @@ class ZyxelBackupTool:
             - Will need to login again after reboot
 
         Example:
-            tool.encrypt_config("modified.xml", "backup.cfg")
+            tool.encrypt_config("config-edited.xml", "config-edited.cfg")
             tool.login("admin", "password")
-            tool.restore_backup("backup.cfg")
+            tool.restore_backup("config-edited.cfg")
         """
         Logger.header("Restoring Configuration to Router")
         Logger.warning("This will overwrite router configuration and reboot the device!")
@@ -779,19 +779,19 @@ def main():
         epilog="""
 EXAMPLES:
   Download encrypted backup:
-    %(prog)s download -u admin -p password -o backup.cfg
+    %(prog)s download -u admin -p password -o config-current.cfg
 
   Restore encrypted configuration (reboots router):
-    %(prog)s restore -i backup.cfg -u admin -p password
+    %(prog)s restore -i config-edited.cfg -u admin -p password
 
   Decrypt existing backup file:
-    %(prog)s decrypt -i backup.cfg -o config.xml
+    %(prog)s decrypt -i config-current.cfg -o config-current.xml
 
   Encrypt configuration file:
-    %(prog)s encrypt -i config.xml -o backup.cfg
+    %(prog)s encrypt -i config-edited.xml -o config-edited.cfg
 
   Use custom router IP:
-    %(prog)s download -u admin -p password -o backup.cfg -r 10.0.0.1
+    %(prog)s download -u admin -p password -o config-current.cfg -r 10.0.0.1
 
 COMMANDS:
   download     Download encrypted backup from router
