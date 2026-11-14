@@ -216,7 +216,7 @@ ENCRYPTION_PASSWORD = "EwhJaD44DfprDOs7OXx9jzAtLg5PKtD8"
 DEFAULT_ROUTER_IP = "192.168.1.1"
 DEFAULT_USERNAME = "admin"
 
-def get_router_credentials():
+def get_router_credentials(require_password=True):
     """Read .env and prompt for any missing router details"""
     env_file = Path(__file__).resolve().with_name(".env")
     values = {}
@@ -240,7 +240,7 @@ def get_router_credentials():
         if not values.get(key):
             values[key] = input(f"{label} [{default}]: ").strip() or default
             changed = True
-    if not values.get("PASSWORD"):
+    if require_password and not values.get("PASSWORD"):
         values["PASSWORD"] = getpass.getpass("Router password: ")
         if not values["PASSWORD"]:
             raise SystemExit("Password is required")
@@ -252,7 +252,7 @@ def get_router_credentials():
             for key, value in values.items():
                 output.write(f"{key}={json.dumps(value, ensure_ascii=False)}\n")
         print(f"Router details saved in {env_file}")
-    return values["ROUTER_IP"], values["USERNAME"], values["PASSWORD"]
+    return values["ROUTER_IP"], values["USERNAME"], values.get("PASSWORD")
 
 
 # ANSI color codes for terminal output
