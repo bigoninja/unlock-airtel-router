@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""
+r"""
 ================================================================================
 Zyxel Router Configuration Backup/Restore Tool
 ================================================================================
@@ -8,15 +8,13 @@ Zyxel Router Configuration Backup/Restore Tool
 DESCRIPTION:
     This tool provides comprehensive functionality for working with Zyxel router
     configuration backups. It can download, decrypt, encrypt, and restore
-    configuration files, as well as extract and analyze firmware images.
+    configuration files.
 
 FEATURES:
     - Download encrypted backups from Zyxel routers via HTTP
     - Decrypt configuration files encrypted with AES-256-CBC
     - Encrypt configuration files for restoration
     - Restore configurations to router (triggers reboot)
-    - Extract and analyze Zyxel firmware images
-    - Automatic discovery of encryption password from firmware
 
 ENCRYPTION DETAILS:
     - Algorithm: AES-256-CBC
@@ -41,44 +39,49 @@ ROUTER WEB INTERFACE:
     - Backup File:  /romfile.cfg
 
 USAGE EXAMPLES:
-    # Download and decrypt backup
-    python3 zyxel_backup_tool.py full-backup -u admin -p password -o config.xml
+    # Download encrypted backup
+    python3 zyxel_backup_restore.py download -u admin -p password -o backup.cfg
 
     # Decrypt existing backup
-    python3 zyxel_backup_tool.py decrypt -i backup.cfg -o config.xml
+    python3 zyxel_backup_restore.py decrypt -i backup.cfg -o config.xml
 
     # Encrypt configuration
-    python3 zyxel_backup_tool.py encrypt -i config.xml -o backup.cfg
+    python3 zyxel_backup_restore.py encrypt -i config.xml -o backup.cfg
 
     # Restore configuration (WARNING: reboots router)
-    python3 zyxel_backup_tool.py full-restore -i config.xml -u admin -p password
-
-    # Extract firmware
-    python3 zyxel_backup_tool.py extract -i firmware.bin -o ./extracted
+    python3 zyxel_backup_restore.py restore -i backup.cfg -u admin -p password
 
     # Use custom router IP
-    python3 zyxel_backup_tool.py full-backup -u admin -p password -o config.xml -r 10.0.0.1
+    python3 zyxel_backup_restore.py download -u admin -p password -o backup.cfg -r 10.0.0.1
 
 REQUIREMENTS:
     Python:
-        - Python 3.6 or higher
+        - Python 3.7 or higher
         - Standard library only (no external packages)
 
     System Tools:
         - openssl: For encryption/decryption operations
-        - binwalk: For firmware extraction (optional)
-        - unsquashfs: For SquashFS extraction (optional)
-        - strings: For binary analysis (optional)
 
 INSTALLATION (System Tools):
+    Windows (PowerShell):
+        Install OpenSSL:
+            winget install ShiningLight.OpenSSL.Light
+        Add to Path:
+            $oldPath = [Environment]::GetEnvironmentVariable("Path", "User")
+            $newPath = $oldPath + ";C:\Program Files\OpenSSL-Win64\bin"
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+
     macOS:
-        brew install openssl binwalk squashfs
+        brew install openssl
+
+    Arch Linux:
+        sudo pacman -S openssl
 
     Ubuntu/Debian:
-        sudo apt-get install openssl binwalk squashfs-tools
+        sudo apt-get install openssl
 
     RHEL/CentOS:
-        sudo yum install openssl binwalk squashfs-tools
+        sudo yum install openssl
 
 SECURITY NOTES:
     WARNING: This tool exposes several security vulnerabilities in the router:
@@ -118,9 +121,8 @@ TECHNICAL IMPLEMENTATION DETAILS:
 
     BACKUP DOWNLOAD:
         1. POST /cgi-bin/backupRestore.cgi with configFilter=1
-        2. Wait 3 seconds for backup generation
-        3. GET /romfile.cfg
-        4. File is encrypted with OpenSSL AES-256-CBC
+        2. GET /romfile.cfg after the export response completes
+        3. File is encrypted with OpenSSL AES-256-CBC
 
     BACKUP RESTORE:
         1. Encrypt XML file first (must be encrypted!)
@@ -136,12 +138,6 @@ TECHNICAL IMPLEMENTATION DETAILS:
     DECRYPTION COMMAND (used by router):
         openssl aes-256-cbc -md MD5 -k EwhJaD44DfprDOs7OXx9jzAtLg5PKtD8 \\
             -d -in /var/tmp/upload_config.cfg -out /var/tmp/decrypt_config.cfg
-
-    FIRMWARE STRUCTURE:
-        - Format: UBI images within GPT partitions
-        - Root FS: SquashFS compressed (ubi_r0.ubifs)
-        - Encryption password found in: /lib/MSTC/libCmd.so
-        - Functions: EncodeRomfile, doSysBackupCfg, make_backup_config
 
 CONFIGURATION FILE STRUCTURE:
     <?xml version="1.0" encoding="UTF-8"?>
@@ -173,7 +169,6 @@ TROUBLESHOOTING:
         - Verify file starts with "Salted__" (check with hexdump)
         - Ensure OpenSSL is installed
         - Check if firmware version uses different encryption password
-        - Extract firmware to find correct password
 
     Download Returns HTML:
         - Session may have expired, try logging in again
@@ -189,7 +184,6 @@ TROUBLESHOOTING:
 VERSION HISTORY:
     v1.0 (2024-11-18): Initial release
         - Full backup/restore functionality
-        - Firmware extraction support
         - Automated encryption/decryption
 
 AUTHOR: Security Research Team
@@ -202,9 +196,7 @@ import os
 import hashlib
 import subprocess
 import argparse
-import time
 import re
-from pathlib import Path
 from typing import Optional
 import urllib.request
 import urllib.parse
@@ -220,9 +212,6 @@ ENCRYPTION_PASSWORD = "EwhJaD44DfprDOs7OXx9jzAtLg5PKtD8"
 # Default router configuration
 DEFAULT_ROUTER_IP = "192.168.1.1"
 DEFAULT_USERNAME = "admin"
-
-# Working directory for temporary files
-WORK_DIR = "./zyxel_work"
 
 # ANSI color codes for terminal output
 class Colors:
@@ -291,12 +280,9 @@ class ZyxelBackupTool:
     - Downloading encrypted backups
     - Encrypting and decrypting configuration files
     - Restoring configurations
-    - Extracting and analyzing firmware
 
     Attributes:
-        router_ip (str): IP address or URL of the router
         base_url (str): Router URL, using HTTP for bare addresses
-        work_dir (Path): Working directory for temporary files
         cookie_jar (CookieJar): HTTP cookie storage
         opener (OpenerDirector): URL opener with cookie handling
 
@@ -314,7 +300,6 @@ class ZyxelBackupTool:
         Args:
             router_ip: IP address or HTTP URL (bare addresses use HTTP)
         """
-        self.router_ip = router_ip
         self.base_url = (
             router_ip if '://' in router_ip else f"http://{router_ip}"
         ).rstrip('/')
@@ -324,8 +309,6 @@ class ZyxelBackupTool:
                 or parsed_url.path or parsed_url.query or parsed_url.fragment):
             raise ValueError("Router must be an IP address or HTTP URL without a path")
 
-        self.work_dir = Path(WORK_DIR)
-        self.work_dir.mkdir(exist_ok=True)
         self.cookie_jar = http.cookiejar.CookieJar()
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(self.cookie_jar)
@@ -343,7 +326,6 @@ class ZyxelBackupTool:
         Returns:
             MD5 hash as hexadecimal string
         """
-        #return hashlib.md5(s.encode('utf-8')).hexdigest()
         return hashlib.md5(data.encode('latin-1')).hexdigest()
 
     def _make_request(self, url: str, data: Optional[dict] = None,
@@ -411,12 +393,8 @@ class ZyxelBackupTool:
                 return False
 
             sid = sid_match.group(1)
-            Logger.info(f"Session ID: {sid}")
 
             # Calculate MD5 hash: MD5(password:sid)
-            #sid = "6fa11769"
-            #password = re.sub(r'%[0-9A-F]{2}', lambda m: m.group(0).lower(), password)
-
             # encodeURIComponent equivalent + lowercase hex escapes
             temp_encode_pwd_val = urllib.parse.quote(password, safe="!'()*")
             temp_encode_pwd_val = re.sub(
@@ -426,10 +404,8 @@ class ZyxelBackupTool:
             )
             password = temp_encode_pwd_val
             hash_input = f"{password}:{sid}"
-            Logger.info(f"{password}:{sid}")
-            
+
             password_hash = self._calculate_md5(hash_input)
-            Logger.info(f"Password hash: {password_hash}")
 
             # Perform login
             Logger.info("Authenticating...")
@@ -438,19 +414,8 @@ class ZyxelBackupTool:
                 "LoginPasswordValue": password_hash,
                 "LoginSidValue": sid,
                 "submitValue": "1",
-                "Prestige_Login": "Login",
-                "fake_username": "",
-                "fake_pass": ""
-
             }
-            #exit()
-            response = self._make_request(login_url, data=login_data)
-
-            Logger.info(
-                f"Cookie names after login: "
-                f"{[cookie.name for cookie in self.cookie_jar]}"
-            )
-            Logger.info(f"Response length: {len(response)} bytes")
+            self._make_request(login_url, data=login_data)
 
             # Verify login by checking for session cookie
             session_cookie = None
@@ -476,9 +441,8 @@ class ZyxelBackupTool:
 
         Process:
         1. POST to /cgi-bin/backupRestore.cgi with configFilter=1
-        2. Wait 3 seconds for backup generation
-        3. GET /romfile.cfg (encrypted backup file)
-        4. Verify file starts with "Salted__" header
+        2. GET /romfile.cfg after the export response completes
+        3. Verify file starts with "Salted__" header
 
         Args:
             output_file: Path to save encrypted backup file
@@ -501,10 +465,6 @@ class ZyxelBackupTool:
             backup_url = f"{self.base_url}/cgi-bin/backupRestore.cgi"
             headers = {"Referer": backup_url}
             self._make_request(backup_url, data={"configFilter": "1"}, headers=headers)
-
-            # Wait for backup to be created
-            Logger.info("Waiting for backup file to be generated...")
-            time.sleep(3)
 
             # Download backup
             Logger.info("Downloading backup file...")
@@ -802,116 +762,6 @@ class ZyxelBackupTool:
             Logger.error(f"Restore error: {e}")
             return False
 
-    def extract_firmware(self, firmware_file: str, output_dir: str) -> bool:
-        """
-        Extract and analyze Zyxel firmware image
-
-        Process:
-        1. Use binwalk to extract UBI images from firmware
-        2. Locate SquashFS root filesystem (ubi_r0.ubifs)
-        3. Extract SquashFS using unsquashfs
-        4. Search for encryption password in libCmd.so
-
-        Firmware structure:
-            - Format: UBI images within GPT partitions
-            - Root FS: ubi_r0.ubifs (SquashFS compressed)
-            - Config: ubi_Config.ubifs
-            - Kernel: ubi_k0.ubifs
-            - Encryption password location: /lib/MSTC/libCmd.so
-
-        Args:
-            firmware_file: Path to firmware binary file
-            output_dir: Directory to extract firmware to
-
-        Returns:
-            True if extraction successful, False otherwise
-
-        Requires:
-            - binwalk: Firmware analysis and extraction
-            - unsquashfs: SquashFS filesystem extraction
-            - strings: Binary string extraction (optional)
-
-        Example:
-            tool.extract_firmware("firmware.bin", "./extracted")
-        """
-        Logger.header("Extracting Firmware")
-        Logger.info(f"Firmware: {firmware_file}")
-        Logger.info(f"Output directory: {output_dir}")
-
-        # Check for required tools
-        try:
-            subprocess.run(['binwalk', '--version'], capture_output=True, check=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            Logger.error("binwalk is required for firmware extraction")
-            Logger.info("Install with: brew install binwalk (macOS) or apt-get install binwalk (Linux)")
-            return False
-
-        try:
-            subprocess.run(['unsquashfs', '-v'], capture_output=True, check=True)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            Logger.error("unsquashfs is required for filesystem extraction")
-            Logger.info("Install with: brew install squashfs (macOS) or apt-get install squashfs-tools (Linux)")
-            return False
-
-        try:
-            # Create output directory
-            os.makedirs(output_dir, exist_ok=True)
-
-            # Extract firmware using binwalk
-            Logger.info("Running binwalk extraction...")
-            subprocess.run(
-                ['binwalk', '-e', firmware_file],
-                cwd=output_dir,
-                check=True
-            )
-
-            # Find SquashFS filesystem
-            Logger.info("Locating root filesystem...")
-            squashfs_files = list(Path(output_dir).rglob('*ubi_r0.ubifs'))
-
-            if not squashfs_files:
-                Logger.error("Could not find root filesystem")
-                return False
-
-            squashfs_file = str(squashfs_files[0])
-            Logger.info(f"Found: {squashfs_file}")
-
-            # Extract SquashFS
-            Logger.info("Extracting SquashFS...")
-            rootfs_dir = os.path.join(output_dir, 'rootfs')
-            subprocess.run(
-                ['unsquashfs', '-d', rootfs_dir, squashfs_file],
-                capture_output=True
-            )
-
-            if os.path.exists(rootfs_dir):
-                Logger.success("Firmware extracted successfully!")
-                Logger.info(f"Root filesystem: {rootfs_dir}")
-
-                # Search for encryption password in libCmd.so
-                Logger.info("Searching for encryption password in firmware...")
-                libcmd_path = os.path.join(rootfs_dir, 'lib', 'MSTC', 'libCmd.so')
-                if os.path.exists(libcmd_path):
-                    try:
-                        result = subprocess.run(
-                            ['strings', libcmd_path],
-                            capture_output=True,
-                            text=True
-                        )
-                        if ENCRYPTION_PASSWORD in result.stdout:
-                            Logger.success(f"Found encryption password in libCmd.so: {ENCRYPTION_PASSWORD}")
-                    except Exception:
-                        pass
-
-                return True
-            else:
-                Logger.error("Extraction failed!")
-                return False
-
-        except Exception as e:
-            Logger.error(f"Extraction error: {e}")
-            return False
-
 
 # ============================================================================
 # COMMAND LINE INTERFACE
@@ -928,11 +778,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 EXAMPLES:
-  Download and decrypt backup:
-    %(prog)s full-backup -u admin -p password -o config.xml
+  Download encrypted backup:
+    %(prog)s download -u admin -p password -o backup.cfg
 
-  Encrypt and restore configuration:
-    %(prog)s full-restore -i modified.xml -u admin -p password
+  Restore encrypted configuration (reboots router):
+    %(prog)s restore -i backup.cfg -u admin -p password
 
   Decrypt existing backup file:
     %(prog)s decrypt -i backup.cfg -o config.xml
@@ -940,29 +790,20 @@ EXAMPLES:
   Encrypt configuration file:
     %(prog)s encrypt -i config.xml -o backup.cfg
 
-  Extract firmware:
-    %(prog)s extract -i firmware.bin -o ./extracted
-
   Use custom router IP:
-    %(prog)s full-backup -u admin -p password -o config.xml -r 10.0.0.1
+    %(prog)s download -u admin -p password -o backup.cfg -r 10.0.0.1
 
 COMMANDS:
   download     Download encrypted backup from router
   decrypt      Decrypt an encrypted backup file
   encrypt      Encrypt a configuration file
   restore      Restore configuration to router (reboots!)
-  full-backup  Download and decrypt in one step
-  full-restore Encrypt and restore in one step
-  extract      Extract and analyze firmware image
 
 For detailed documentation, see the header comments in this script.
         """
     )
 
-    parser.add_argument('command', choices=[
-        'download', 'decrypt', 'encrypt', 'restore',
-        'full-backup', 'full-restore', 'extract'
-    ], help='Command to execute')
+    parser.add_argument('command', choices=['download', 'decrypt', 'encrypt', 'restore'], help='Command to execute')
 
     parser.add_argument('-r', '--router', default=DEFAULT_ROUTER_IP,
                        help=f'Router IP or HTTP URL (default: http://{DEFAULT_ROUTER_IP})')
@@ -1015,40 +856,6 @@ For detailed documentation, see the header comments in this script.
             success = tool.restore_backup(args.input)
             sys.exit(0 if success else 1)
         sys.exit(1)
-
-    elif args.command == 'full-backup':
-        if not args.password or not args.output:
-            Logger.error("full-backup requires --password and --output")
-            sys.exit(1)
-        temp_encrypted = os.path.join(WORK_DIR, 'temp_backup.cfg')
-        if tool.login(args.username, args.password):
-            if tool.download_backup(temp_encrypted):
-                if tool.decrypt_backup(temp_encrypted, args.output, args.key):
-                    os.remove(temp_encrypted)
-                    sys.exit(0)
-        sys.exit(1)
-
-    elif args.command == 'full-restore':
-        if not args.password or not args.input:
-            Logger.error("full-restore requires --password and --input")
-            sys.exit(1)
-        confirm = input("Are you sure you want to restore configuration? This will reboot the router (yes/no): ")
-        if confirm.lower() != 'yes':
-            Logger.info("Restore cancelled")
-            sys.exit(0)
-        temp_encrypted = os.path.join(WORK_DIR, 'temp_restore.cfg')
-        if tool.encrypt_config(args.input, temp_encrypted, args.key):
-            if tool.login(args.username, args.password):
-                if tool.restore_backup(temp_encrypted):
-                    sys.exit(0)
-        sys.exit(1)
-
-    elif args.command == 'extract':
-        if not args.input or not args.output:
-            Logger.error("extract requires --input and --output")
-            sys.exit(1)
-        success = tool.extract_firmware(args.input, args.output)
-        sys.exit(0 if success else 1)
 
 
 if __name__ == '__main__':
