@@ -1,0 +1,7 @@
+# Router backup files contain credentials.
+config-*.cfg
+config-*.xml
+backup-*/
+zyxel_work/
+__pycache__/
+*.py[cod]
