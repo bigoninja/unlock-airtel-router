@@ -56,7 +56,7 @@ USAGE EXAMPLES:
 
 REQUIREMENTS:
     Python:
-        - Python 3.7 or higher
+        - Python 3.14 or higher
         - Standard library only (no external packages)
 
     System Tools:
@@ -241,7 +241,7 @@ def get_router_credentials(require_password=True):
             values[key] = input(f"{label} [{default}]: ").strip() or default
             changed = True
     if require_password and not values.get("PASSWORD"):
-        values["PASSWORD"] = getpass.getpass("Router password: ")
+        values["PASSWORD"] = getpass.getpass("Router password: ", echo_char="*")
         if not values["PASSWORD"]:
             raise SystemExit("Password is required")
         changed = True
