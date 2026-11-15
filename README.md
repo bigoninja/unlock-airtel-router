@@ -69,7 +69,7 @@ cd unlock-airtel-router
 
 or using `Code → Download ZIP`.
 
-### :key: 1. Enable SSH
+### 1. Enable SSH
 
 ```bash
 python enable_ssh.py
@@ -81,7 +81,7 @@ The script saves a backup in a `backup-...` folder, enables SSH, and reboots the
 
 Wait for the router to come back online before continuing.
 
-### :unlock: 2. Unlock the UI
+### 2. Unlock the UI
 
 ```bash
 python unlock_ui.py
