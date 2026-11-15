@@ -38,11 +38,15 @@ echo 'export PATH="$(brew --prefix python)/libexec/bin:$PATH"' >> ~/.zshrc
 ### :computer: Windows (Run PowerShell as Administrator)
 
 ```powershell
-winget install ShiningLight.OpenSSL.Light
+# python
 winget install --id Python.PythonInstallManager --exact
-
 py install default
+
+# openssh
 Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+
+# openssl
+winget install ShiningLight.OpenSSL.Light
 
 $oldPath = [Environment]::GetEnvironmentVariable("Path", "User")
 $newPath = $oldPath + ";C:\Program Files\OpenSSL-Win64\bin"
@@ -54,7 +58,7 @@ $newPath = $oldPath + ";C:\Program Files\OpenSSL-Win64\bin"
 > [!WARNING]
 > Use at your own risk. These scripts change your router configuration and reboot it. Keep the original backup somewhere safe.
 
-Make sure you're connected to your router’s Wi-Fi or LAN.
+Restart your terminal. Make sure you're connected to your router’s Wi-Fi/LAN.
 
 Clone this repository using:
 
