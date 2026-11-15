@@ -107,10 +107,12 @@ For bug reports, include your router model, firmware version, operating system, 
 
 ## :mag: How it works
 
-The firmware contains a boolean setting called `InternetGatewayDevice.DeviceInfo.X_5067F0_DebugVersionFlag`. The LAN and IPv6 page handlers check this flag when building the web page:
+The firmware contains a boolean setting called `InternetGatewayDevice.DeviceInfo.X_5067F0_DebugVersionFlag`. Enabling it exposes many disabled controls and hidden pages across the web UI.
 
-- **`0`** — leave out the save function and hide the Apply button.
-- **`1`** — include the save function and skip the code that hides Apply.
+The web UI uses this flag to decide which additional pages and controls are available:
+
+- **`0`** — keep certain pages and controls hidden or disabled.
+- **`1`** — make those pages and controls available in the web UI.
 
 The firmware's HTML templates use zone markers to decide which blocks to send to the browser. For example, `lanSetup.html` contains these two zones (save function shortened):
 
@@ -126,7 +128,7 @@ $("#Apply_ID").hide();
 
 `ipv6LanSetup.html` uses the same pattern. The zone markers are handled by the router before the page reaches your browser; `#Apply_ID` is the jQuery selector for the button. Simply unhiding it in the browser won't restore the missing `uiSave()` function.
 
-[unlock_ui.py](unlock_ui.py) uses the router's `ccctest` tool over SSH to set the live flag to `1`, then reads it back to confirm. This brings back the controls and also exposed additional pages during testing.
+[unlock_ui.py](unlock_ui.py) uses the router's `ccctest` tool over SSH to set the live flag to `1`, then reads it back to confirm.
 
 The firmware resets the flag during boot, which is why changing it in a config backup alone didn't work. The script adds a startup block to `/etc/rc.local` that waits 90 seconds and sets it again after each reboot.
 
