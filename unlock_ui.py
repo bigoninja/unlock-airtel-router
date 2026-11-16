@@ -8,7 +8,18 @@ import subprocess
 
 from zyxel_backup_restore import get_router_credentials
 
-REQUEST = """RDMNAME config;
+REQUEST_UINT8 = """RDMNAME config;
+REQUEST;
+SEL InternetGatewayDevice.DeviceInfo;
+SET X_5067F0_DebugVersionFlag uint8 1;
+SEND;
+REQUEST;
+SEL InternetGatewayDevice.DeviceInfo;
+GET X_5067F0_DebugVersionFlag;
+SEND;
+"""
+
+REQUEST_BOOL = """RDMNAME config;
 REQUEST;
 SEL InternetGatewayDevice.DeviceInfo;
 SET X_5067F0_DebugVersionFlag boolean 1;
@@ -20,16 +31,22 @@ SEND;
 """
 
 UNLOCK = f"""reply=$(/usr/bin/ccctest -f /proc/self/fd/0 2>&1 <<'UNLOCK_CCC'
-{REQUEST}UNLOCK_CCC
-)
+{REQUEST_UINT8}UNLOCK_CCC
+) || :
+if ! printf '%s\\n' "$reply" | grep -q 'GET X_5067F0_DebugVersionFlag: success' ||
+   ! printf '%s\\n' "$reply" | grep -q '^[[:space:]]*Value=1[[:space:]]*$'; then
+    reply=$(/usr/bin/ccctest -f /proc/self/fd/0 2>&1 <<'UNLOCK_CCC'
+{REQUEST_BOOL}UNLOCK_CCC
+    ) || :
+fi
 printf '%s\\n' "$reply"
-case "$reply" in
-    *"GET X_5067F0_DebugVersionFlag: success"*"Value=1"*)
-        echo 'UI flag enabled.' ;;
-    *)
-        echo 'Could not confirm the UI flag.' >&2
-        exit 1 ;;
-esac
+if printf '%s\\n' "$reply" | grep -q 'GET X_5067F0_DebugVersionFlag: success' &&
+   printf '%s\\n' "$reply" | grep -q '^[[:space:]]*Value=1[[:space:]]*$'; then
+    echo 'UI flag enabled.'
+else
+    echo 'Could not confirm the UI flag.' >&2
+    exit 1
+fi
 """
 
 SCRIPT = f"""set -e
@@ -41,7 +58,7 @@ if [ ! -f "$startup" ]; then
     printf '#!/bin/sh\\n\\nexit 0\\n' > "$startup"
 fi
 if grep -Fxq '# BEGIN_UNLOCK_UI' "$startup" ||
-   grep -Fxq 'SET X_5067F0_DebugVersionFlag boolean 1;' "$startup"; then
+   grep -q 'SET X_5067F0_DebugVersionFlag' "$startup"; then
     echo 'UI startup command is already installed.'
     exit 0
 fi
@@ -51,8 +68,8 @@ case "$(head -n 1 "$startup")" in
     *) echo 'rc.local must start with a shell shebang.' >&2; exit 1 ;;
 esac
 
-block=$(mktemp)
-candidate=$(mktemp /etc/rc.local.XXXXXX)
+block="/tmp/unlock_block_$$.tmp"
+candidate="/tmp/rc.local_$$.tmp"
 trap 'rm -f "$block" "$candidate"' 0
 cat > "$block" <<'UNLOCK_STARTUP'
 # BEGIN_UNLOCK_UI

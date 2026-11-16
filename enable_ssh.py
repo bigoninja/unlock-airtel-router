@@ -4,6 +4,7 @@ Enable LAN SSH and set user level to 0
 ============================================
 """
 
+import sys
 from datetime import datetime
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -25,8 +26,6 @@ def add_ssh_config(router_ip, username, port):
     User {username}
     Port {port}
     HostKeyAlgorithms +ssh-rsa
-    IgnoreUnknown WarnWeakCrypto
-    WarnWeakCrypto no-pq-kex
     PreferredAuthentications password
     PasswordAuthentication yes
     PubkeyAuthentication no
@@ -44,7 +43,8 @@ def add_ssh_config(router_ip, username, port):
 
     config.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     config.write_text(entry + "\nHost *\n" + existing, encoding="utf-8")
-    config.chmod(0o600)
+    if sys.platform != "win32":
+        config.chmod(0o600)
     return True
 
 
