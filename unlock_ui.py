@@ -63,11 +63,6 @@ if grep -Fxq '# BEGIN_UNLOCK_UI' "$startup" ||
     exit 0
 fi
 
-case "$(head -n 1 "$startup")" in
-    '#!'*) ;;
-    *) echo 'rc.local must start with a shell shebang.' >&2; exit 1 ;;
-esac
-
 block="/tmp/unlock_block_$$.tmp"
 candidate="/tmp/rc.local_$$.tmp"
 trap 'rm -f "$block" "$candidate"' 0
@@ -81,7 +76,20 @@ cat > "$block" <<'UNLOCK_STARTUP'
 UNLOCK_STARTUP
 
 cp -p "$startup" "$candidate"
-sed "1r $block" "$startup" > "$candidate"
+
+case "$(head -n 1 "$startup")" in
+    '#!'*)
+        sed "1r $block" "$startup" > "$candidate"
+        ;;
+    *)
+        {{
+            printf '#!/bin/sh\\n'
+            cat "$block"
+            cat "$startup"
+        }} > "$candidate"
+        ;;
+esac
+
 sh -n "$candidate"
 mv -f "$candidate" "$startup"
 echo 'UI startup script installed.'
