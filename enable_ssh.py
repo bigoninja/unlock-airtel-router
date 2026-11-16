@@ -21,15 +21,12 @@ def set_value(parent, name, value, **attributes):
 
 def add_ssh_config(router_ip, username, port):
     config = Path.home() / ".ssh" / "config"
-    warn_weak = "" if sys.platform == "win32" else """    IgnoreUnknown WarnWeakCrypto
-    WarnWeakCrypto no-pq-kex
-"""
     entry = f"""Host airtel
     HostName {router_ip}
     User {username}
     Port {port}
     HostKeyAlgorithms +ssh-rsa
-{warn_weak}    PreferredAuthentications password
+    PreferredAuthentications password
     PasswordAuthentication yes
     PubkeyAuthentication no
 """
