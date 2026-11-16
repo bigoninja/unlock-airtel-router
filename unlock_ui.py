@@ -32,14 +32,16 @@ SEND;
 
 UNLOCK = f"""reply=$(/usr/bin/ccctest -f /proc/self/fd/0 2>&1 <<'UNLOCK_CCC'
 {REQUEST_UINT8}UNLOCK_CCC
-)
-if ! echo "$reply" | grep -q "Value=1" && ! echo "$reply" | grep -q "SET X_5067F0_DebugVersionFlag: success"; then
+) || :
+if ! printf '%s\\n' "$reply" | grep -q 'GET X_5067F0_DebugVersionFlag: success' ||
+   ! printf '%s\\n' "$reply" | grep -q '^[[:space:]]*Value=1[[:space:]]*$'; then
     reply=$(/usr/bin/ccctest -f /proc/self/fd/0 2>&1 <<'UNLOCK_CCC'
 {REQUEST_BOOL}UNLOCK_CCC
-    )
+    ) || :
 fi
 printf '%s\\n' "$reply"
-if echo "$reply" | grep -q "Value=1" || echo "$reply" | grep -q "SET X_5067F0_DebugVersionFlag: success"; then
+if printf '%s\\n' "$reply" | grep -q 'GET X_5067F0_DebugVersionFlag: success' &&
+   printf '%s\\n' "$reply" | grep -q '^[[:space:]]*Value=1[[:space:]]*$'; then
     echo 'UI flag enabled.'
 else
     echo 'Could not confirm the UI flag.' >&2
