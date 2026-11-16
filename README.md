@@ -3,7 +3,12 @@
 # :unlock: Unlock Airtel Router
 
 > [!IMPORTANT]
-> These scripts are only tested on Airtel Zyxel AOT5221ZY and AOT5222ZY ONT and might not work correctly with other ONTs.
+> These scripts have been tested on the following ONTs and may not work correctly on other models:
+>
+> - AOT5221ZY
+> - AOT5222ZY
+> - PMG5617-R20B
+
 
 Restore disabled and hidden settings in the Airtel router web UI. The scripts enable SSH on your Airtel router, unlock the UI and keep it unlocked after each reboot.
 
@@ -107,7 +112,7 @@ For bug reports, include your router model, firmware version, operating system, 
 
 ## :mag: How it works
 
-The firmware contains a boolean setting called `InternetGatewayDevice.DeviceInfo.X_5067F0_DebugVersionFlag`. Enabling it exposes many disabled controls and hidden pages across the web UI.
+The firmware contains a setting called `InternetGatewayDevice.DeviceInfo.X_5067F0_DebugVersionFlag`. Enabling it exposes many disabled controls and hidden pages across the web UI.
 
 The web UI uses this flag to decide which additional pages and controls are available:
 
